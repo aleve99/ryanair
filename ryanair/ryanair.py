@@ -38,7 +38,8 @@ class Ryanair:
             pool_size=pool_size
         )
 
-        self.active_airports = self.get_active_airports()
+        self.active_airports: Tuple[Airport, ...] = tuple()
+        self.update_active_airports()
 
     def get(self, url: str, **kwargs) -> Response:
         self.sm.set_next_proxy()
@@ -73,6 +74,9 @@ class Ryanair:
 
         return res.json()
     
+    def update_active_airports(self):
+        self.active_airports = self.get_active_airports()
+
     def get_active_airports(self) -> Tuple[Airport, ...]:
         logger.info(f"Getting Ryanair active airports")
         res = self.get(self._active_airports_url())
