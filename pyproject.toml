@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ryanair"
-version = "0.1.1"
+version = "0.1.2"
 description = "Python Package to manage and retrieve information about Ryanair flights and fares"
 readme = "README.md"
 authors = [

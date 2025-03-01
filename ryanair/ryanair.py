@@ -211,8 +211,8 @@ class Ryanair:
     def search_round_trip_fares(
             self,
             origin: str,
-            min_nights: int,
-            max_nights: int,
+            min_days: int,
+            max_days: int,
             from_date: date,
             to_date: date = None,
             destinations: Iterable[str] = []
@@ -231,8 +231,8 @@ class Ryanair:
                 to_date=to_date,
                 destinations=destinations
             ),
-            min_nights=min_nights,
-            max_nights=max_nights
+            min_days=min_days,
+            max_days=max_days
         )
 
         timer.stop()
@@ -580,8 +580,8 @@ class Ryanair:
             self,
             origin: str,
             code_requests_map: Dict[str, List[grequests.AsyncRequest]],
-            min_nights: int,
-            max_nights: int
+            min_days: int,
+            max_days: int
         ) -> List[RoundTripFare]:
 
         fares, timer = list(), Timer()
@@ -594,8 +594,8 @@ class Ryanair:
                 fares.extend(
                     self._compute_responses(
                         responses=responses,
-                        min_nights=min_nights,
-                        max_nights=max_nights
+                        min_days=min_days,
+                        max_days=max_days
                     )
                 )
 
@@ -660,8 +660,8 @@ class Ryanair:
     def _compute_responses(
             self,
             responses: List[Response],
-            min_nights: int,
-            max_nights: int
+            min_days: int,
+            max_days: int
         ) -> List[RoundTripFare]:
 
         for req_num, res in enumerate(responses):
@@ -696,7 +696,7 @@ class Ryanair:
                         if date_in < date_out:
                             i = (date_out - date_in).days
                             continue
-                        elif min_nights <= (date_in - date_out).days <= max_nights:
+                        elif min_days <= (date_in - date_out).days <= max_days:
                             for return_flight in trip_date_in['flights']:
 
                                 if return_flight['faresLeft'] != 0:
