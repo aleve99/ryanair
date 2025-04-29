@@ -1,4 +1,5 @@
 import grequests
+from requests.adapters import HTTPAdapter
 
 from itertools import cycle
 from typing import List, Dict
@@ -18,13 +19,16 @@ class SessionManager:
 
     def __init__(self, timeout: int, pool_size: int):
         self._session = grequests.Session()
+        adapter = HTTPAdapter(pool_connections=pool_size, pool_maxsize=pool_size)
+        self._session.mount('http://', adapter)
+        self._session.mount('https://', adapter)
         self._session.headers = self.SESSION_HEADERS
         self._update_session_cookies()
 
         self._create_proxies_pool()
         self._session.hooks = {"response": self._hook}
-        self.pool_size = pool_size
-        self.timeout = timeout
+        self._pool_size = pool_size
+        self._timeout = timeout
 
     def _update_session_cookies(self):
         self.session.get(
@@ -39,17 +43,9 @@ class SessionManager:
     def pool_size(self) -> int:
         return self._pool_size
     
-    @pool_size.setter
-    def pool_size(self, size: int) -> None:
-        self._pool_size = size
-
     @property
     def timeout(self) -> int:
         return self._timeout
-    
-    @timeout.setter
-    def timeout(self, timeout: int) -> None:
-        self._timeout = timeout
 
     def _create_proxies_pool(self) -> None:
         self._proxies_pool = [{}]
