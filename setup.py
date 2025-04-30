@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="ryanair",
-    version="0.1.2",
+    version="0.2.0",
     author="Alessio",
     author_email="alessiovecchi00@gmail.com",
     description="Python Package to manage and retrieve information about Ryanair flights and fares",
@@ -20,8 +20,7 @@ setup(
     ],
     python_requires=">=3.10",
     install_requires=[
-        "grequests>=0.7.0",
-        "requests>=2.28.0",
+        "aiohttp>=3.11.14",
         "tomli>=2.0.1;python_version<'3.11'",
     ],
 ) 
