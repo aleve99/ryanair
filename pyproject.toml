@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "ryanair"
 version = "0.2.0"
-description = Python Package to manage and retrieve information about Ryanair flights and fares"
+description = "Python Package to manage and retrieve information about Ryanair flights and fares"
 readme = "README.md"
 authors = [
     {name = "Alessio", email = "alessiovecchi00@gmail.com"}
@@ -18,8 +18,8 @@ classifiers = [
 ]
 requires-python = ">=3.10"
 dependencies = [
-    "aiohttp>=3.11.14"
-    "tomli>=2.0.1;python_version<'3.11'",
+    "aiohttp>=3.11.14",
+    "tomli>=2.0.1;python_version<'3.11'"
 ]
 
 [project.urls]
