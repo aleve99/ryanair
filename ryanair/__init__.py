@@ -1,6 +1,4 @@
 from .logger import *
-import grequests
-import requests
 
 from .ryanair import Ryanair
 from .types import Airport, OneWayFare, RoundTripFare, Schedule
