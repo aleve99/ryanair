@@ -22,6 +22,7 @@ class Ryanair:
     def __init__(
             self,
             timeout: int = 10,
+            pool_size: int = 10,
             max_retries: int = 5,
             USD: Optional[bool] = False
         ) -> None:
@@ -35,6 +36,10 @@ class Ryanair:
 
         self._max_retries = max_retries
         self.sm = SessionManager(timeout=timeout)
+        
+        # Create a semaphore for limiting concurrent requests
+        self._pool_size = pool_size
+        self._request_semaphore = asyncio.Semaphore(pool_size)
 
         # Initialize active_airports - will be populated asynchronously later
         self.active_airports: Optional[Tuple[Airport, ...]] = None
@@ -480,7 +485,6 @@ class Ryanair:
 
         Must be called within an `async with` block for initialization.
         If `destinations` is empty, it will fetch them using `get_destination_codes`.
-        If `to_date` is None, it defaults to 30 days after `from_date`.
         Note: This endpoint does not provide 'faresLeft'.
         Note: Pagination is currently not handled.
         """
@@ -811,6 +815,8 @@ class Ryanair:
     ) -> List[aiohttp.ClientResponse | Exception]: # Return list of responses or exceptions
         """Executes a list of prepared requests concurrently using asyncio.gather.
 
+        Uses a semaphore to limit the number of concurrent requests based on pool_size.
+
         Args:
             request_params: A list of dictionaries, where each dict contains
                             'url' and 'params' keys for `self.get`.
@@ -823,12 +829,17 @@ class Ryanair:
         if not request_params:
             return []
 
+        logger.debug(f"Executing {len(request_params)} requests with concurrency limit of {self._pool_size}...")
+        
+        async def fetch_with_semaphore(params):
+            async with self._request_semaphore:
+                return await self.get(url=params["url"], params=params.get("params"))
+                
         tasks = [
-            self.get(url=p["url"], params=p.get("params")) 
+            fetch_with_semaphore(p) 
             for p in request_params
         ]
         
-        logger.debug(f"Executing {len(tasks)} requests concurrently...")
         results = await asyncio.gather(*tasks, return_exceptions=True)
         logger.debug(f"Finished executing {len(tasks)} requests.")
         
