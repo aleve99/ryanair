@@ -945,7 +945,7 @@ class Ryanair:
         # Execute all schedule requests concurrently
         results = await self._execute_requests_concurrently(all_request_params)
         timer.stop()
-        logger.info(f"Fetched schedules data for {origin} to {list(destinations)} in {timer.seconds_elapsed}s")
+        logger.info(f"Fetched schedules data for {origin} in {timer.seconds_elapsed}s")
 
         processing_timer = Timer(start=True)
         # Process results
