@@ -413,8 +413,6 @@ class Ryanair:
         if not destinations:
             destinations = await self.get_destination_codes(origin)
         
-        timer = Timer(start=True)
-
         # Prepare parameters for all required requests
         code_requests_params = await self._prepare_availability_request_params(
             origin=origin,
@@ -434,7 +432,7 @@ class Ryanair:
             param_index += len(params_list)
 
         # Execute all requests concurrently
-        results = await self._execute_requests_concurrently(all_request_params)
+        results, execution_time = await self._execute_requests_concurrently(all_request_params)
 
         fares = []
         for i, result in enumerate(results):
@@ -469,9 +467,8 @@ class Ryanair:
                             )
             except Exception as e:
                  logger.error(f"Failed to process response for {origin}-{dest} (index {i}): {e}", exc_info=True)
-
-        timer.stop()
-        logger.info(f"Scraped {origin} one-way fares (v1) in {timer.seconds_elapsed}s")
+        
+        logger.info(f"Scraped {origin} one-way fares in {execution_time:.2f}s, found {len(fares)} fares.")
         return fares
 
     async def search_one_way_fares_v2(
@@ -490,9 +487,7 @@ class Ryanair:
         """
         if not destinations:
             destinations = await self.get_destination_codes(origin)
-        
-        timer = Timer(start=True)
-
+                
         # Prepare parameters for all required requests
         request_params = await self._prepare_availability_request_params_v2(
             origin=origin,
@@ -503,12 +498,9 @@ class Ryanair:
         )
 
         # Execute requests concurrently
-        results = await self._execute_requests_concurrently(request_params)
-        timer.stop()
-        logger.info(f"Scraped {origin} one-way fares (v2) requests in {timer.seconds_elapsed}s")
+        results, execution_time = await self._execute_requests_concurrently(request_params)
 
         fares = []
-        processing_timer = Timer(start=True)
         for result in results:
             if isinstance(result, Exception):
                 logger.warning(f"Farfnd request failed: {result}")
@@ -544,8 +536,7 @@ class Ryanair:
             except Exception as e:
                  logger.error(f"Failed to process farfnd response: {e}", exc_info=True)
         
-        processing_timer.stop()
-        logger.debug(f"Processed {origin} one-way fares (v2) responses in {processing_timer.seconds_elapsed}s. Found {len(fares)} fares.")
+        logger.info(f"Scraped {origin} one-way fares in {execution_time:.2f}s, found {len(fares)} fares.")
         return fares
 
     async def _prepare_availability_request_params(
@@ -812,7 +803,7 @@ class Ryanair:
     async def _execute_requests_concurrently(
         self,
         request_params: List[Dict]
-    ) -> List[aiohttp.ClientResponse | Exception]: # Return list of responses or exceptions
+    ) -> Tuple[List[aiohttp.ClientResponse | Exception], float]:
         """Executes a list of prepared requests concurrently using asyncio.gather.
 
         Uses a semaphore to limit the number of concurrent requests based on pool_size.
@@ -825,13 +816,17 @@ class Ryanair:
             A list containing either `aiohttp.ClientResponse` objects for successful
             requests or `Exception` objects for failed requests. The order corresponds
             to the input `request_params`. Caller must handle response context/closing.
+            Also returns the total execution time in seconds.
         """
         if not request_params:
             return []
 
         logger.debug(f"Executing {len(request_params)} requests with concurrency limit of {self._pool_size}...")
         
-        async def fetch_with_semaphore(params):
+        # Simple approach to track just the execution time
+        execution_timer = Timer(start=True)
+        
+        async def fetch_with_semaphore(params: Dict):
             async with self._request_semaphore:
                 return await self.get(url=params["url"], params=params.get("params"))
                 
@@ -841,13 +836,15 @@ class Ryanair:
         ]
         
         results = await asyncio.gather(*tasks, return_exceptions=True)
-        logger.debug(f"Finished executing {len(tasks)} requests.")
+        
+        execution_timer.stop()
+        logger.debug(f"Finished executing {len(tasks)} requests in {execution_timer.seconds_elapsed:.2f}s")
         
         success_count = sum(1 for r in results if isinstance(r, aiohttp.ClientResponse))
         error_count = len(results) - success_count
         logger.debug(f"Concurrent execution results: {success_count} successes, {error_count} errors.")
 
-        return results
+        return results, execution_timer.seconds_elapsed
 
     async def _execute_and_compute_availability(
             self,
@@ -867,17 +864,17 @@ class Ryanair:
         Returns:
             A list of `RoundTripFare` objects.
         """
-        fares, timer = list(), Timer()
+        fares: List[RoundTripFare] = list()
 
         for code, param_list in code_requests_params.items():
             if not param_list:
                 logger.debug(f"No request parameters prepared for {origin}-{code}, skipping.")
                 continue
-                
-            timer.start()
+            
             logger.debug(f"Executing {len(param_list)} availability requests for {origin}-{code}...")
+            
             # Execute requests for this destination
-            results = await self._execute_requests_concurrently(param_list)
+            results, execution_time = await self._execute_requests_concurrently(param_list)
             
             successful_data = []
             for i, result in enumerate(results):
@@ -912,9 +909,8 @@ class Ryanair:
                 fares.extend(computed_fares)
             else:
                 logger.warning(f"No successful availability data collected for {origin}-{code}")
-                    
-            timer.stop()
-            logger.info(f"{origin}-{code} availability scraped in {timer.seconds_elapsed}s")
+            
+            logger.info(f"{origin}-{code} availability scraped in {execution_time:.2f}s")
 
         return fares
 
@@ -932,7 +928,6 @@ class Ryanair:
              found within the specified date range.
         """
         schedules_by_code: Dict[str, List[Schedule]] = {dest: [] for dest in destinations}
-        timer = Timer()
 
         # Prepare schedule request parameters
         code_requests_params = await self._prepare_schedules_request_params(
@@ -951,12 +946,10 @@ class Ryanair:
             for i in range(len(params_list)):
                 dest_map[param_index + i] = dest
             param_index += len(params_list)
-            
-        timer.start()
+        
         # Execute all schedule requests concurrently
-        results = await self._execute_requests_concurrently(all_request_params)
-        timer.stop()
-        logger.info(f"Fetched schedules data for {origin} in {timer.seconds_elapsed}s")
+        results, execution_time = await self._execute_requests_concurrently(all_request_params)
+        logger.info(f"Fetched schedules data for {origin} in {execution_time:.2f}s")
 
         processing_timer = Timer(start=True)
         # Process results

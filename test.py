@@ -28,6 +28,7 @@ RT_MAX_DAYS = 5
 CLIENT_TIMEOUT = 20
 CLIENT_MAX_RETRIES = 3
 CLIENT_USE_USD = True
+CLIENT_POOL_SIZE = 50
 
 async def main():
     logger.info("Initializing Ryanair client using async context manager...")
@@ -35,7 +36,8 @@ async def main():
     async with Ryanair(
         timeout=CLIENT_TIMEOUT, 
         max_retries=CLIENT_MAX_RETRIES, 
-        USD=CLIENT_USE_USD
+        USD=CLIENT_USE_USD,
+        pool_size=CLIENT_POOL_SIZE
     ) as client:
         logger.info("Client initialized (session opened).")
 

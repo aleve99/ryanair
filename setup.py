@@ -1,11 +1,18 @@
 from setuptools import setup, find_packages
+import os
+import re
+
+# Read version from __init__.py
+with open(os.path.join("ryanair", "__init__.py"), "r", encoding="utf-8") as f:
+    version_match = re.search(r"^__version__ = ['\"]([^'\"]*)['\"]", f.read(), re.M)
+    version = version_match.group(1)
 
 with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
 setup(
     name="ryanair",
-    version="0.2.3",
+    version=version,
     author="Alessio",
     author_email="alessiovecchi00@gmail.com",
     description="Python Package to manage and retrieve information about Ryanair flights and fares",
