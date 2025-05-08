@@ -819,7 +819,7 @@ class Ryanair:
             Also returns the total execution time in seconds.
         """
         if not request_params:
-            return []
+            return [], 0.0
 
         logger.debug(f"Executing {len(request_params)} requests with concurrency limit of {self._pool_size}...")
         
