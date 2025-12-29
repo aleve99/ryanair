@@ -1,6 +1,7 @@
 import logging
 import asyncio
 import aiohttp
+import xxhash
 
 from copy import deepcopy
 from typing import Optional, Tuple, List, Iterable, Dict
@@ -454,6 +455,11 @@ class Ryanair:
                         for flight in filter(
                             lambda fl: fl['faresLeft'] != 0, trip_date['flights']
                         ):
+                            # Extract flight number (e.g., "FR1234")
+                            flight_num = flight.get('flightNumber', '').replace(' ', '')
+                            # For Ryanair, operating and marketing carrier are typically the same
+                            carrier = flight_num[:2] if len(flight_num) >= 2 else ''
+                            
                             fares.append(
                                 OneWayFare(
                                     datetime.fromisoformat(flight['time'][0]),
@@ -462,7 +468,10 @@ class Ryanair:
                                     dest,   # Use destination mapped from index
                                     flight['regularFare']['fares'][0]['amount'],
                                     flight['faresLeft'],
-                                    currency
+                                    currency,
+                                    flight_num,
+                                    operating_carrier=carrier,
+                                    marketing_carrier=carrier
                                 )
                             )
             except Exception as e:
@@ -519,6 +528,11 @@ class Ryanair:
                         
                         # Basic validation of expected keys
                         try:
+                            # Extract flight number (e.g., "FR1234")
+                            flight_num = info.get('flightNumber', '').replace(' ', '')
+                            # For Ryanair, operating and marketing carrier are typically the same
+                            carrier = flight_num[:2] if len(flight_num) >= 2 else ''
+                            
                             fares.append(
                                 OneWayFare(
                                     datetime.fromisoformat(info['departureDate']),
@@ -527,7 +541,10 @@ class Ryanair:
                                     info['arrivalAirport']['iataCode'],
                                     info['price']['value'],
                                     -1, # faresLeft not available in this endpoint
-                                    info['price']['currencyCode']
+                                    info['price']['currencyCode'],
+                                    flight_number=flight_num,
+                                    operating_carrier=carrier,
+                                    marketing_carrier=carrier
                                 )
                             )
                         except (KeyError, TypeError, ValueError) as parse_err:
@@ -1096,19 +1113,42 @@ class Ryanair:
                                                     ret_fare_info and len(ret_fare_info) >= 1):
                                                 logger.debug(f"Skipping fare pair due to missing time/fare data. Out: {outbound_flight}, Ret: {return_flight}")
                                                 continue
+                                            
+                                            # Extract flight numbers and carriers
+                                            out_flight_num = outbound_flight.get('flightNumber', '').replace(' ', '')
+                                            out_carrier = out_flight_num[:2] if len(out_flight_num) >= 2 else ''
+                                            ret_flight_num = return_flight.get('flightNumber', '').replace(' ', '')
+                                            ret_carrier = ret_flight_num[:2] if len(ret_flight_num) >= 2 else ''
+                                            
+                                            outbound_fare = OneWayFare(
+                                                dep_time=datetime.fromisoformat(out_time[0]),
+                                                arr_time=datetime.fromisoformat(out_time[1]),
+                                                origin=origin,
+                                                destination=destination,
+                                                fare=out_fare_info[0]['amount'],
+                                                left=outbound_flight['faresLeft'],
+                                                currency=currency,
+                                                flight_number=out_flight_num,
+                                                operating_carrier=out_carrier,
+                                                marketing_carrier=out_carrier
+                                            )
+                                            
+                                            inbound_fare = OneWayFare(
+                                                dep_time=datetime.fromisoformat(ret_time[0]),
+                                                arr_time=datetime.fromisoformat(ret_time[1]),
+                                                origin=destination,  # Return: dest -> origin
+                                                destination=origin,
+                                                fare=ret_fare_info[0]['amount'],
+                                                left=return_flight['faresLeft'],
+                                                currency=currency,
+                                                flight_number=ret_flight_num,
+                                                operating_carrier=ret_carrier,
+                                                marketing_carrier=ret_carrier
+                                            )
                                                  
                                             fares.append(RoundTripFare(
-                                                datetime.fromisoformat(out_time[0]),
-                                                datetime.fromisoformat(out_time[1]),
-                                                datetime.fromisoformat(ret_time[0]),
-                                                datetime.fromisoformat(ret_time[1]),
-                                                origin, # Use passed origin
-                                                destination, # Use passed destination
-                                                out_fare_info[0]['amount'],
-                                                outbound_flight['faresLeft'],
-                                                ret_fare_info[0]['amount'],
-                                                return_flight['faresLeft'],
-                                                currency
+                                                outbound=outbound_fare,
+                                                inbound=inbound_fare
                                             ))
                                         except (KeyError, IndexError, ValueError, TypeError) as parse_err:
                                             logger.warning(f"Failed parsing fare pair for {origin}-{destination}: {parse_err}. Out: {outbound_flight}, Ret: {return_flight}")
@@ -1117,10 +1157,26 @@ class Ryanair:
                  logger.error(f"Error in outer fare computation loop for {origin}-{destination} on {trip_date_out.get('dateOut')}: {outer_loop_err}", exc_info=True)
         
         return fares
+
+    @staticmethod
+    def get_flight_key(fare: OneWayFare) -> int:
+        """Compute flight_key as a signed 64-bit integer.
+        
+        Format: "{operating_carrier}|{flight_number}|{departure_time}"
+        """
+        text = f"{fare.operating_carrier}|{fare.flight_number}|{fare.dep_time.isoformat()}"
+        unsigned = xxhash.xxh64(text).intdigest()
+        return unsigned if unsigned < 2**63 else unsigned - 2**64
     
     @staticmethod
-    def get_flight_key(flight: OneWayFare) -> str:
-        return f"{flight.origin}({flight.dep_time}):{flight.destination}({flight.arr_time})"
+    def get_fare_key(fare: OneWayFare) -> int:
+        """Compute fare_key as a signed 64-bit integer
+        
+        Format: "{marketing_carrier}|{operating_carrier}|{flight_number}|{departure_time}"
+        """
+        text = f"{fare.marketing_carrier}|{fare.operating_carrier}|{fare.flight_number}|{fare.dep_time.isoformat()}"
+        unsigned = xxhash.xxh64(text).intdigest()
+        return unsigned if unsigned < 2**63 else unsigned - 2**64
 
     @classmethod
     def _airport_info_url(cls, iata_code: str) -> str:

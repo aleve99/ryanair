@@ -17,8 +17,8 @@ logger = logging.getLogger("ryanair.test")
 # Common Search Parameters
 ORIGIN = "STN"
 DEST = "MLA"
-DATE_FROM = date(2025, 5, 1)
-DATE_TO = date(2025, 5, 15)
+DATE_FROM = date(2026, 3, 1)
+DATE_TO = date(2026, 3, 15)
 
 # Round Trip Specific Parameters
 RT_MIN_DAYS = 2

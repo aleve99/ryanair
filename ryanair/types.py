@@ -11,20 +11,6 @@ class Airport:
     location: Optional[str]
 
 @dataclass(eq=True, frozen=True)
-class RoundTripFare:
-    outbound_dep_time: datetime
-    outbound_arr_time: datetime
-    return_dep_time: datetime
-    return_arr_time: datetime
-    origin: str
-    destination: str
-    outbound_fare: float
-    outbound_left: int
-    return_fare: float
-    return_left: int
-    currency: str
-
-@dataclass(eq=True, frozen=True)
 class OneWayFare:
     dep_time: datetime
     arr_time: datetime
@@ -33,9 +19,25 @@ class OneWayFare:
     fare: float
     left: int
     currency: str
+    flight_number: str = ""         # e.g., "FR1453"
+    operating_carrier: str = ""     # e.g., "FR" - who operates the flight
+    marketing_carrier: str = ""     # e.g., "FR" - who sells the ticket
 
     def to_dict(self):
         return asdict(self)
+
+@dataclass(eq=True, frozen=True)
+class RoundTripFare:
+    outbound: OneWayFare
+    inbound: OneWayFare
+    
+    @property
+    def total_fare(self) -> float:
+        return self.outbound.fare + self.inbound.fare
+    
+    @property
+    def currency(self) -> str:
+        return self.outbound.currency
 
 @dataclass(eq=True, frozen=True)
 class Schedule:

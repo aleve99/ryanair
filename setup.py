@@ -29,5 +29,6 @@ setup(
     install_requires=[
         "aiohttp>=3.11.14",
         "tomli>=2.0.1;python_version<'3.11'",
+        "xxhash>=3.6.0",
     ],
 ) 
