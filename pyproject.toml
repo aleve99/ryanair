@@ -19,8 +19,12 @@ classifiers = [
 requires-python = ">=3.10"
 dependencies = [
     "aiohttp>=3.11.14",
-    "tomli>=2.0.1;python_version<'3.11'"
+    "tomli>=2.0.1;python_version<'3.11'",
+    "xxhash>=3.6.0"
 ]
+
+[tool.setuptools.dynamic]
+version = {attr = "ryanair.__version__"}
 
 [project.urls]
 "Homepage" = "https://github.com/aleve99/ryanair"
